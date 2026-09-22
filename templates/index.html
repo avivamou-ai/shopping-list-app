@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>רשימת קניות</title>
+  <meta name="theme-color" content="#2c7a4b">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🛒 רשימת קניות</h1>
+    <a class="link-btn" href="/catalog">ניהול מוצרים</a>
+  </header>
+
+  <main>
+    {% if not grouped %}
+      <p class="empty">הרשימה ריקה. לכו ל<a href="/catalog">ניהול מוצרים</a> כדי להוסיף מוצרים קבועים או להוסיף פריט חד-פעמי.</p>
+    {% endif %}
+
+    {% for store in stores %}
+      {% if grouped.get(store) %}
+        <section class="store-section">
+          <h2>{{ store }}</h2>
+          {% for category, items in grouped[store].items() %}
+            <div class="category-block">
+              <h3>{{ category }}</h3>
+              <ul class="item-list">
+                {% for item in items %}
+                  <li class="item {{ 'checked' if item.checked else '' }}" data-id="{{ item.id }}">
+                    <label>
+                      <input type="checkbox" class="toggle" data-id="{{ item.id }}" {{ 'checked' if item.checked else '' }}>
+                      <span>{{ item.name }}</span>
+                    </label>
+                    {% if item.frequency == 'occasional' %}
+                      <button class="remove-btn" data-id="{{ item.id }}" title="הסר מהרשימה">✕</button>
+                    {% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </section>
+      {% endif %}
+    {% endfor %}
+
+    <button id="finish-btn" class="finish-btn">✅ סיימתי לקנות</button>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
