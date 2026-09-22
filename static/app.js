@@ -1,32 +1,105 @@
-function post(url) {
-  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+async function ensureWeeklyOnList() {
+  await supabase.from('products').update({ on_list: true })
+    .eq('frequency', 'weekly').eq('active', true).eq('on_list', false);
 }
 
-document.querySelectorAll('.toggle').forEach(cb => {
-  cb.addEventListener('change', async () => {
-    const id = cb.dataset.id;
-    await post(`/api/list/toggle/${id}`);
-    cb.closest('.item').classList.toggle('checked', cb.checked);
-  });
-});
-
-document.querySelectorAll('.remove-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const id = btn.dataset.id;
-    await post(`/api/list/remove/${id}`);
-    btn.closest('.item').remove();
-  });
-});
-
-const finishBtn = document.getElementById('finish-btn');
-if (finishBtn) {
-  finishBtn.addEventListener('click', async () => {
-    if (!confirm('לסיים קנייה ולנקות את הרשימה?')) return;
-    await post('/api/list/finish');
-    location.reload();
-  });
+async function loadList() {
+  await ensureWeeklyOnList();
+  const { data, error } = await supabase.from('products')
+    .select('*').eq('active', true).eq('on_list', true)
+    .order('store').order('category').order('name');
+  if (error) {
+    console.error(error);
+    return;
+  }
+  render(data);
 }
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+function render(items) {
+  const main = document.getElementById('list-container');
+  main.innerHTML = '';
+  if (!items.length) {
+    main.innerHTML = '<p class="empty">הרשימה ריקה. לכו ל<a href="catalog.html">ניהול מוצרים</a> כדי להוסיף מוצרים.</p>';
+    return;
+  }
+  const grouped = {};
+  for (const item of items) {
+    (grouped[item.store] ??= {});
+    (grouped[item.store][item.category] ??= []).push(item);
+  }
+  for (const store of STORE_ORDER) {
+    if (!grouped[store]) continue;
+    const section = document.createElement('section');
+    section.className = 'store-section';
+    const h2 = document.createElement('h2');
+    h2.textContent = store;
+    section.appendChild(h2);
+    for (const cat of CATEGORY_ORDER) {
+      if (!grouped[store][cat]) continue;
+      const block = document.createElement('div');
+      block.className = 'category-block';
+      const h3 = document.createElement('h3');
+      h3.textContent = cat;
+      block.appendChild(h3);
+      const ul = document.createElement('ul');
+      ul.className = 'item-list';
+      for (const item of grouped[store][cat]) {
+        ul.appendChild(buildItemRow(item));
+      }
+      block.appendChild(ul);
+      section.appendChild(block);
+    }
+    main.appendChild(section);
+  }
+}
+
+function buildItemRow(item) {
+  const li = document.createElement('li');
+  li.className = 'item' + (item.checked ? ' checked' : '');
+  const label = document.createElement('label');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = item.checked;
+  cb.className = 'toggle';
+  cb.addEventListener('change', () => toggleItem(item.id, cb.checked, li));
+  const span = document.createElement('span');
+  span.textContent = item.name;
+  label.append(cb, span);
+  li.appendChild(label);
+  if (item.frequency === 'occasional') {
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '✕';
+    btn.title = 'הסר מהרשימה';
+    btn.addEventListener('click', () => removeFromList(item.id, li));
+    li.appendChild(btn);
+  }
+  return li;
+}
+
+async function toggleItem(id, checked, li) {
+  li.classList.toggle('checked', checked);
+  await supabase.from('products').update({ checked }).eq('id', id);
+}
+
+async function removeFromList(id, li) {
+  li.remove();
+  await supabase.from('products').update({ on_list: false, checked: false }).eq('id', id);
+}
+
+async function finishShopping() {
+  if (!confirm('לסיים קנייה ולנקות את הרשימה?')) return;
+  await supabase.from('products').update({ checked: false }).eq('frequency', 'weekly');
+  await supabase.from('products').update({ on_list: false, checked: false }).eq('frequency', 'occasional');
+  loadList();
+}
+
+let finishBtnBound = false;
+
+function onAuthed() {
+  if (!finishBtnBound) {
+    document.getElementById('finish-btn').addEventListener('click', finishShopping);
+    finishBtnBound = true;
+  }
+  loadList();
 }

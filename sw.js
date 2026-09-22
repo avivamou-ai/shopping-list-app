@@ -1,6 +1,8 @@
-const CACHE_NAME = 'shopping-list-v1';
-const APP_SHELL = ['/', '/catalog', '/static/style.css', '/static/app.js',
-                    '/static/catalog.js', '/static/manifest.json', '/static/icon.svg'];
+const CACHE_NAME = 'shopping-list-v2';
+const APP_SHELL = ['./', './index.html', './catalog.html', './static/style.css',
+                    './static/constants.js', './static/supabase-client.js', './static/auth.js',
+                    './static/app.js', './static/catalog.js', './static/manifest.json',
+                    './static/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -19,8 +21,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then((res) => {

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>רשימת קניות</title>
+  <meta name="theme-color" content="#2c7a4b">
+  <link rel="manifest" href="static/manifest.json">
+  <link rel="apple-touch-icon" href="static/icon.svg">
+  <link rel="icon" href="static/icon.svg">
+  <link rel="stylesheet" href="static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-form">
+      <h1>🛒 רשימת קניות</h1>
+      <input type="email" id="login-email" placeholder="אימייל" required autocomplete="email">
+      <input type="password" id="login-password" placeholder="סיסמה" required autocomplete="current-password">
+      <button type="submit">התחבר</button>
+      <p id="login-error" class="login-error"></p>
+    </form>
+  </div>
+
+  <div id="app-screen" hidden>
+    <header class="topbar">
+      <h1>🛒 רשימת קניות</h1>
+      <div class="header-actions">
+        <a class="link-btn" href="catalog.html">ניהול מוצרים</a>
+        <button id="logout-btn" class="link-btn">התנתק</button>
+      </div>
+    </header>
+    <main>
+      <div id="list-container"></div>
+      <button id="finish-btn" class="finish-btn">✅ סיימתי לקנות</button>
+    </main>
+  </div>
+
+  <script src="static/supabase-client.js"></script>
+  <script src="static/constants.js"></script>
+  <script src="static/auth.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ניהול מוצרים</title>
+  <meta name="theme-color" content="#2c7a4b">
+  <link rel="manifest" href="static/manifest.json">
+  <link rel="apple-touch-icon" href="static/icon.svg">
+  <link rel="icon" href="static/icon.svg">
+  <link rel="stylesheet" href="static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-form">
+      <h1>ניהול מוצרים</h1>
+      <input type="email" id="login-email" placeholder="אימייל" required autocomplete="email">
+      <input type="password" id="login-password" placeholder="סיסמה" required autocomplete="current-password">
+      <button type="submit">התחבר</button>
+      <p id="login-error" class="login-error"></p>
+    </form>
+  </div>
+
+  <div id="app-screen" hidden>
+    <header class="topbar">
+      <h1>ניהול מוצרים</h1>
+      <div class="header-actions">
+        <a class="link-btn" href="index.html">חזרה לרשימה</a>
+        <button id="logout-btn" class="link-btn">התנתק</button>
+      </div>
+    </header>
+    <main>
+      <form id="add-form" class="add-form">
+        <input type="text" id="new-name" placeholder="שם מוצר" required>
+        <select id="new-category">
+          <option>ירקות ופירות</option>
+          <option>מוצרי חלב</option>
+          <option>דגים ובשר</option>
+          <option>שתייה</option>
+          <option>פיצוחים וחטיפים</option>
+          <option>מוצרי ניקיון</option>
+          <option>טואלטיקה</option>
+          <option>מזווה</option>
+          <option>אחר</option>
+        </select>
+        <select id="new-store">
+          <option>רמי לוי</option>
+          <option>אושר עד</option>
+          <option>שופרסל</option>
+          <option>ויקטורי</option>
+          <option>קרפור</option>
+          <option>נטו חיסכון</option>
+          <option>סופר 100</option>
+          <option>פאפא</option>
+          <option>כל חנות</option>
+        </select>
+        <select id="new-frequency">
+          <option value="weekly">כל שבוע</option>
+          <option value="occasional">לא כל שבוע</option>
+        </select>
+        <button type="submit">➕ הוסף מוצר</button>
+      </form>
+
+      <div id="catalog-container"></div>
+    </main>
+  </div>
+
+  <script src="static/supabase-client.js"></script>
+  <script src="static/constants.js"></script>
+  <script src="static/auth.js"></script>
+  <script src="static/catalog.js"></script>
+</body>
+</html>
