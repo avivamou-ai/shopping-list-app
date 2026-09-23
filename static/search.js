@@ -2,16 +2,44 @@ async function runSearch(query) {
   const resultsEl = document.getElementById('search-results');
   resultsEl.innerHTML = '<p class="empty">מחפש...</p>';
 
-  const { data, error } = await supabaseClient
+  // עדיפות למוצרים שהשם שלהם מתחיל במילה שחיפשת (למשל "מלפפון") על פני
+  // מוצרים שבהם המילה מופיעה בתוך שם ארוך יותר (כמו "דאודורנט בניחוח
+  // מלפפון") - שניהם התאמות לגיטימיות, אבל לא באותה רלוונטיות.
+  const prefixQuery = await supabaseClient
     .from('prices')
     .select('*')
-    .ilike('item_name', `%${query}%`)
+    .ilike('item_name', `${query}%`)
     .order('item_name')
-    .limit(500);
+    .limit(300);
 
-  if (error) {
-    resultsEl.innerHTML = `<p class="empty">שגיאה בחיפוש: ${error.message}</p>`;
+  if (prefixQuery.error) {
+    resultsEl.innerHTML = `<p class="empty">שגיאה בחיפוש: ${prefixQuery.error.message}</p>`;
     return;
+  }
+
+  let data = prefixQuery.data;
+  const seenKeys = new Set(data.map((r) => `${r.barcode}|${r.chain}`));
+
+  if (data.length < 30) {
+    const containsQuery = await supabaseClient
+      .from('prices')
+      .select('*')
+      .ilike('item_name', `%${query}%`)
+      .order('item_name')
+      .limit(300);
+
+    if (containsQuery.error) {
+      resultsEl.innerHTML = `<p class="empty">שגיאה בחיפוש: ${containsQuery.error.message}</p>`;
+      return;
+    }
+
+    for (const row of containsQuery.data) {
+      const key = `${row.barcode}|${row.chain}`;
+      if (!seenKeys.has(key)) {
+        data.push(row);
+        seenKeys.add(key);
+      }
+    }
   }
 
   if (!data.length) {
