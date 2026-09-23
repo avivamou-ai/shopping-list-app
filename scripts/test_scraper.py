@@ -11,12 +11,20 @@ output_dir = "scraper_test_output"
 
 # רשת -> מחרוזת חיפוש בכתובת (מהמשתמש, כפי שנמסר)
 TARGETS = {
-    "OSHER_AD": "בעלי המלאכה",
     "YAYNO_BITAN_AND_CARREFOUR": "מנחם בגין",
-    "YOHANANOF": "ז'בוטינסקי",
+    "YOHANANOF": "זבוטינסקי",
     "VICTORY_NEW_SOURCE": "הטיילת",
     "SHUFERSAL": "הבושם",
 }
+
+QUOTE_CHARS = "'׳’״\""
+
+
+def normalize(text):
+    return re.sub(f"[{re.escape(QUOTE_CHARS)}\\s]", "", text)
+
+
+NORMALIZED_TARGETS = {name: normalize(street) for name, street in TARGETS.items()}
 
 task = ScarpingTask(
     enabled_scrapers=list(TARGETS.keys()),
@@ -40,14 +48,31 @@ for root, _dirs, filenames in os.walk(output_dir):
         except UnicodeError:
             content = raw.decode("utf-8", errors="replace")
 
-        blocks = re.findall(r"<Store>.*?</Store>", content, flags=re.DOTALL)
-        print(f"Total <Store> records: {len(blocks)}")
+        blocks = []
+        for tag in ("Store", "STORE", "Branch"):
+            blocks = re.findall(rf"<{tag}>.*?</{tag}>", content, flags=re.DOTALL)
+            if blocks:
+                break
+        print(f"Total store records: {len(blocks)}")
 
-        # search every target street against this file - simplest and robust,
-        # since folder names don't map 1:1 to scraper names
-        for scraper_name, street in TARGETS.items():
-            hits = [b for b in blocks if street in b]
+        if not blocks:
+            print("No store blocks found with known tag names - raw snippet:")
+            print(content[:1500])
+            continue
+
+        normalized_blocks = [(b, normalize(b)) for b in blocks]
+        for scraper_name, norm_street in NORMALIZED_TARGETS.items():
+            hits = [b for b, nb in normalized_blocks if norm_street in nb]
             if hits:
-                print(f"-- matches for '{street}' ({scraper_name}): {len(hits)}")
+                print(f"-- matches for '{TARGETS[scraper_name]}' ({scraper_name}): {len(hits)}")
                 for b in hits:
                     print(b)
+
+        # Fallback / cross-check: Ashdod's municipal city code is 70
+        # (confirmed from the Rami Levi and Osher Ad store files), so any
+        # store carrying that code is in Ashdod regardless of how its
+        # street name is spelled/punctuated in this file.
+        city_hits = [b for b in blocks if "<City>70</City>" in b]
+        print(f"-- stores with <City>70</City> (Ashdod): {len(city_hits)}")
+        for b in city_hits:
+            print(b)
