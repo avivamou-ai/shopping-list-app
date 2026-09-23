@@ -47,11 +47,17 @@ async function runSearch(query) {
     return;
   }
 
+  // קבוצה לפי שם מוצר (לא ברקוד): פירות/ירקות טריים ומוצרים במשקל
+  // מקבלים ברקוד/מק"ט פנימי שונה בכל רשת, אז אותו "מלפפון" מופיע עם
+  // כמה ברקודים - מבחינת התצוגה זה עדיין אותו מוצר ושורה אחת.
   const products = {};
   const chainsSeen = new Set();
   for (const row of data) {
-    const product = (products[row.barcode] ??= { name: row.item_name, prices: {} });
-    product.prices[row.chain] = row.price;
+    const product = (products[row.item_name] ??= { prices: {}, barcodes: new Set() });
+    if (!(row.chain in product.prices) || row.price < product.prices[row.chain]) {
+      product.prices[row.chain] = row.price;
+    }
+    product.barcodes.add(row.barcode);
     chainsSeen.add(row.chain);
   }
 
@@ -83,8 +89,8 @@ function buildPriceTable(products, chains) {
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  for (const barcode of Object.keys(products)) {
-    const product = products[barcode];
+  for (const name of Object.keys(products)) {
+    const product = products[name];
     const cheapestPrice = Math.min(...Object.values(product.prices));
     const cheapestChain = Object.keys(product.prices).find(
       (c) => product.prices[c] === cheapestPrice
@@ -92,7 +98,7 @@ function buildPriceTable(products, chains) {
 
     const row = document.createElement('tr');
     const nameCell = document.createElement('td');
-    nameCell.textContent = product.name;
+    nameCell.textContent = name;
     row.appendChild(nameCell);
 
     for (const chain of chains) {
@@ -111,7 +117,7 @@ function buildPriceTable(products, chains) {
     const addBtn = document.createElement('button');
     addBtn.className = 'add-to-list-btn';
     addBtn.textContent = 'הוסף';
-    addBtn.addEventListener('click', () => openAddForm(row, barcode, product, chains.length + 2));
+    addBtn.addEventListener('click', () => openAddForm(row, name, product, chains.length + 2));
     actionCell.appendChild(addBtn);
     row.appendChild(actionCell);
 
@@ -123,12 +129,14 @@ function buildPriceTable(products, chains) {
   return wrapper;
 }
 
-function openAddForm(productRow, barcode, product, colSpan) {
+function openAddForm(productRow, name, product, colSpan) {
   const table = productRow.parentElement;
-  if (table.querySelector(`tr[data-form-for="${barcode}"]`)) return;
+  const alreadyOpen = [...table.querySelectorAll('tr[data-form-for]')]
+    .some((tr) => tr.dataset.formFor === name);
+  if (alreadyOpen) return;
 
   const formRow = document.createElement('tr');
-  formRow.dataset.formFor = barcode;
+  formRow.dataset.formFor = name;
   const cell = document.createElement('td');
   cell.colSpan = colSpan;
 
@@ -158,10 +166,15 @@ function openAddForm(productRow, barcode, product, colSpan) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const frequency = freqSelect.value;
-    // אין קיבוע לחנות למוצרים עם ברקוד - איפה הכי זול נקבע דינמית
-    // לפי המחירים העדכניים, לא בזמן ההוספה לקטלוג
+    // מוצר עם ברקוד אחד ויחיד בכל הרשתות (מוצר ארוז עם ברקוד יצרן
+    // אחיד) נשמר לפי הברקוד הזה. מוצרים במשקל (פירות/ירקות טריים)
+    // מקבלים מק"ט שונה בכל רשת - עבורם שומרים רק את השם, וההשוואה
+    // העתידית תתאים לפי שם המוצר במקום ברקוד ספציפי.
+    const barcode = product.barcodes.size === 1 ? [...product.barcodes][0] : null;
+    // אין קיבוע לחנות - איפה הכי זול נקבע דינמית לפי המחירים העדכניים,
+    // לא בזמן ההוספה לקטלוג
     const { error } = await supabaseClient.from('products').insert({
-      name: product.name,
+      name,
       barcode,
       category: categorySelect.value,
       store: 'כל חנות',

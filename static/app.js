@@ -100,39 +100,58 @@ async function compareBasketCost() {
 
   const { data: listItems, error: listErr } = await supabaseClient
     .from('products')
-    .select('barcode')
-    .eq('active', true).eq('on_list', true).not('barcode', 'is', null);
+    .select('barcode, name')
+    .eq('active', true).eq('on_list', true);
   if (listErr) {
     resultsEl.innerHTML = `<p class="empty">שגיאה: ${listErr.message}</p>`;
     return;
   }
 
-  const barcodes = [...new Set(listItems.map((i) => i.barcode))];
-  if (!barcodes.length) {
-    resultsEl.innerHTML = '<p class="empty">אין ברשימה כרגע מוצרים עם ברקוד מקושר (הוסיפו מוצרים דרך <a href="search.html">חיפוש</a>).</p>';
+  // מוצרים עם ברקוד יחיד תואמים לפי הברקוד; מוצרים במשקל (בלי ברקוד
+  // אחיד, כמו ירקות טריים) תואמים לפי שם המוצר - ר' static/search.js
+  const barcodes = [...new Set(listItems.filter((i) => i.barcode).map((i) => i.barcode))];
+  const names = [...new Set(listItems.filter((i) => !i.barcode).map((i) => i.name))];
+  const totalItemCount = barcodes.length + names.length;
+
+  if (!totalItemCount) {
+    resultsEl.innerHTML = '<p class="empty">אין ברשימה כרגע מוצרים עם מחיר מקושר (הוסיפו מוצרים דרך <a href="search.html">חיפוש</a>).</p>';
     return;
   }
 
-  const { data: priceRows, error: priceErr } = await supabaseClient
-    .from('prices')
-    .select('chain, barcode, price')
-    .in('barcode', barcodes);
-  if (priceErr) {
-    resultsEl.innerHTML = `<p class="empty">שגיאה: ${priceErr.message}</p>`;
-    return;
-  }
-
-  const totals = {};
-  for (const row of priceRows) {
-    const t = (totals[row.chain] ??= { total: 0, barcodes: new Set() });
-    if (!t.barcodes.has(row.barcode)) {
-      t.barcodes.add(row.barcode);
-      t.total += row.price;
+  const matchedRows = [];
+  if (barcodes.length) {
+    const { data, error } = await supabaseClient
+      .from('prices').select('chain, barcode, price').in('barcode', barcodes);
+    if (error) {
+      resultsEl.innerHTML = `<p class="empty">שגיאה: ${error.message}</p>`;
+      return;
     }
+    for (const row of data) matchedRows.push({ chain: row.chain, key: row.barcode, price: row.price });
+  }
+  if (names.length) {
+    const { data, error } = await supabaseClient
+      .from('prices').select('chain, item_name, price').in('item_name', names);
+    if (error) {
+      resultsEl.innerHTML = `<p class="empty">שגיאה: ${error.message}</p>`;
+      return;
+    }
+    for (const row of data) matchedRows.push({ chain: row.chain, key: row.item_name, price: row.price });
   }
 
-  const ranked = Object.keys(totals)
-    .map((chain) => ({ chain, total: totals[chain].total, count: totals[chain].barcodes.size }))
+  // מחיר מינימלי לכל (רשת, מוצר) - יכול להיות יותר מרשומה אחת לפותר
+  // שם-מוצר אם לכמה ברקודים באותה רשת יש בדיוק אותו שם
+  const perChain = {};
+  for (const row of matchedRows) {
+    const byKey = (perChain[row.chain] ??= {});
+    if (!(row.key in byKey) || row.price < byKey[row.key]) byKey[row.key] = row.price;
+  }
+
+  const ranked = Object.keys(perChain)
+    .map((chain) => {
+      const byKey = perChain[chain];
+      const total = Object.values(byKey).reduce((sum, p) => sum + p, 0);
+      return { chain, total, count: Object.keys(byKey).length };
+    })
     .sort((a, b) => a.total - b.total);
 
   resultsEl.innerHTML = '';
@@ -147,7 +166,7 @@ async function compareBasketCost() {
     const li = document.createElement('li');
     li.className = 'item';
     const span = document.createElement('span');
-    span.textContent = `${r.chain} — ₪${r.total.toFixed(2)} (${r.count}/${barcodes.length} מוצרים נמצאו)`;
+    span.textContent = `${r.chain} — ₪${r.total.toFixed(2)} (${r.count}/${totalItemCount} מוצרים נמצאו)`;
     if (idx === 0) span.style.fontWeight = 'bold';
     li.appendChild(span);
     ul.appendChild(li);
