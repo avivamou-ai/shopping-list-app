@@ -170,6 +170,21 @@ main {
 }
 .finish-btn:active { background: var(--primary-dark); }
 
+.compare-btn {
+  background: #a15c00;
+}
+.compare-btn:active { background: #7c4700; }
+
+#compare-results {
+  margin-top: 0.75rem;
+}
+#compare-results .item-list {
+  background: var(--card);
+  border-radius: 0.75rem;
+  padding: 0.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
 .add-form {
   background: var(--card);
   padding: 1rem;

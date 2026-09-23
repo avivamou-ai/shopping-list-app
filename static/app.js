@@ -94,12 +94,74 @@ async function finishShopping() {
   loadList();
 }
 
-let finishBtnBound = false;
+async function compareBasketCost() {
+  const resultsEl = document.getElementById('compare-results');
+  resultsEl.innerHTML = '<p class="empty">מחשב...</p>';
+
+  const { data: listItems, error: listErr } = await supabaseClient
+    .from('products')
+    .select('barcode')
+    .eq('active', true).eq('on_list', true).not('barcode', 'is', null);
+  if (listErr) {
+    resultsEl.innerHTML = `<p class="empty">שגיאה: ${listErr.message}</p>`;
+    return;
+  }
+
+  const barcodes = [...new Set(listItems.map((i) => i.barcode))];
+  if (!barcodes.length) {
+    resultsEl.innerHTML = '<p class="empty">אין ברשימה כרגע מוצרים עם ברקוד מקושר (הוסיפו מוצרים דרך <a href="search.html">חיפוש</a>).</p>';
+    return;
+  }
+
+  const { data: priceRows, error: priceErr } = await supabaseClient
+    .from('prices')
+    .select('chain, barcode, price')
+    .in('barcode', barcodes);
+  if (priceErr) {
+    resultsEl.innerHTML = `<p class="empty">שגיאה: ${priceErr.message}</p>`;
+    return;
+  }
+
+  const totals = {};
+  for (const row of priceRows) {
+    const t = (totals[row.chain] ??= { total: 0, barcodes: new Set() });
+    if (!t.barcodes.has(row.barcode)) {
+      t.barcodes.add(row.barcode);
+      t.total += row.price;
+    }
+  }
+
+  const ranked = Object.keys(totals)
+    .map((chain) => ({ chain, total: totals[chain].total, count: totals[chain].barcodes.size }))
+    .sort((a, b) => a.total - b.total);
+
+  resultsEl.innerHTML = '';
+  if (!ranked.length) {
+    resultsEl.innerHTML = '<p class="empty">לא נמצאו מחירים עדכניים למוצרים האלה.</p>';
+    return;
+  }
+
+  const ul = document.createElement('ul');
+  ul.className = 'item-list';
+  ranked.forEach((r, idx) => {
+    const li = document.createElement('li');
+    li.className = 'item';
+    const span = document.createElement('span');
+    span.textContent = `${r.chain} — ₪${r.total.toFixed(2)} (${r.count}/${barcodes.length} מוצרים נמצאו)`;
+    if (idx === 0) span.style.fontWeight = 'bold';
+    li.appendChild(span);
+    ul.appendChild(li);
+  });
+  resultsEl.appendChild(ul);
+}
+
+let listButtonsBound = false;
 
 function onAuthed() {
-  if (!finishBtnBound) {
+  if (!listButtonsBound) {
     document.getElementById('finish-btn').addEventListener('click', finishShopping);
-    finishBtnBound = true;
+    document.getElementById('compare-btn').addEventListener('click', compareBasketCost);
+    listButtonsBound = true;
   }
   loadList();
 }
