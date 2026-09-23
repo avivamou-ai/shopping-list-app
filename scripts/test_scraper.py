@@ -10,7 +10,7 @@ from il_supermarket_scarper import ScarpingTask, ScraperFactory
 output_dir = "scraper_test_output"
 
 task = ScarpingTask(
-    enabled_scrapers=[ScraperFactory.RAMI_LEVY],
+    enabled_scrapers=[ScraperFactory.RAMI_LEVY.name],
     output_configuration={"output_mode": "disk", "base_storage_path": output_dir},
     timeout_in_seconds=300,
 )
