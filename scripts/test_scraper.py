@@ -10,10 +10,8 @@ from il_supermarket_scarper import ScarpingTask, ScraperFactory
 output_dir = "scraper_test_output"
 
 # רשת -> מחרוזת חיפוש בכתובת (מהמשתמש, כפי שנמסר)
+# אושר עד ויוחננוף כבר אותרו בהצלחה בסבבים קודמים
 TARGETS = {
-    "YAYNO_BITAN_AND_CARREFOUR": "מנחם בגין",
-    "YOHANANOF": "זבוטינסקי",
-    "VICTORY_NEW_SOURCE": "הטיילת",
     "SHUFERSAL": "הבושם",
 }
 
@@ -43,10 +41,23 @@ for root, _dirs, filenames in os.walk(output_dir):
 
         with open(path, "rb") as fh:
             raw = fh.read()
-        try:
-            content = raw.decode("utf-16")
-        except UnicodeError:
+
+        content = None
+        for encoding in ("utf-16", "utf-16-be", "utf-16-le", "utf-8"):
+            try:
+                candidate = raw.decode(encoding)
+            except UnicodeError:
+                continue
+            # a correctly-decoded government XML file starts with a
+            # recognizable ASCII tag; anything else means we guessed
+            # the wrong encoding/byte order
+            if candidate.lstrip().startswith("<") and "Root" in candidate[:50]:
+                content = candidate
+                print(f"(decoded with {encoding})")
+                break
+        if content is None:
             content = raw.decode("utf-8", errors="replace")
+            print("(could not confidently decode - falling back to utf-8 with replacement)")
 
         blocks = []
         for tag in ("Store", "STORE", "Branch"):
