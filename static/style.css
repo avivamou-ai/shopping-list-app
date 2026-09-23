@@ -229,6 +229,55 @@ main {
   cursor: pointer;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+  background: var(--card);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.price-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.price-table th, .price-table td {
+  padding: 0.6rem 0.7rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.price-table th:first-child, .price-table td:first-child {
+  text-align: right;
+  white-space: normal;
+  min-width: 10rem;
+}
+
+.price-table thead th {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.cheapest-cell {
+  font-weight: bold;
+  color: var(--primary-dark);
+}
+
+.no-offer-cell {
+  color: var(--border);
+}
+
+.price-table .add-form {
+  margin: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: var(--bg);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14201a;

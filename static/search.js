@@ -7,7 +7,7 @@ async function runSearch(query) {
     .select('*')
     .ilike('item_name', `%${query}%`)
     .order('item_name')
-    .limit(300);
+    .limit(500);
 
   if (error) {
     resultsEl.innerHTML = `<p class="empty">שגיאה בחיפוש: ${error.message}</p>`;
@@ -19,53 +19,90 @@ async function runSearch(query) {
     return;
   }
 
-  const groups = {};
+  const products = {};
+  const chainsSeen = new Set();
   for (const row of data) {
-    (groups[row.barcode] ??= { name: row.item_name, offers: [] }).offers.push(row);
+    const product = (products[row.barcode] ??= { name: row.item_name, prices: {} });
+    product.prices[row.chain] = row.price;
+    chainsSeen.add(row.chain);
   }
+
+  const chains = [...chainsSeen].sort((a, b) => {
+    const ia = STORE_ORDER.indexOf(a);
+    const ib = STORE_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
 
   resultsEl.innerHTML = '';
-  for (const barcode of Object.keys(groups)) {
-    const group = groups[barcode];
-    group.offers.sort((a, b) => a.price - b.price);
-    resultsEl.appendChild(buildProductGroup(barcode, group));
+  resultsEl.appendChild(buildPriceTable(products, chains));
+}
+
+function buildPriceTable(products, chains) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'table-wrapper';
+
+  const table = document.createElement('table');
+  table.className = 'price-table';
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.appendChild(document.createElement('th')).textContent = 'מוצר';
+  for (const chain of chains) {
+    headRow.appendChild(document.createElement('th')).textContent = chain;
   }
+  headRow.appendChild(document.createElement('th'));
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const barcode of Object.keys(products)) {
+    const product = products[barcode];
+    const cheapestPrice = Math.min(...Object.values(product.prices));
+    const cheapestChain = Object.keys(product.prices).find(
+      (c) => product.prices[c] === cheapestPrice
+    );
+
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    nameCell.textContent = product.name;
+    row.appendChild(nameCell);
+
+    for (const chain of chains) {
+      const cell = document.createElement('td');
+      if (chain in product.prices) {
+        cell.textContent = `₪${product.prices[chain].toFixed(2)}`;
+        if (chain === cheapestChain) cell.className = 'cheapest-cell';
+      } else {
+        cell.textContent = '—';
+        cell.className = 'no-offer-cell';
+      }
+      row.appendChild(cell);
+    }
+
+    const actionCell = document.createElement('td');
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-to-list-btn';
+    addBtn.textContent = 'הוסף';
+    addBtn.addEventListener('click', () => openAddForm(row, barcode, product, cheapestChain, chains.length + 2));
+    actionCell.appendChild(addBtn);
+    row.appendChild(actionCell);
+
+    tbody.appendChild(row);
+  }
+  table.appendChild(tbody);
+
+  wrapper.appendChild(table);
+  return wrapper;
 }
 
-function buildProductGroup(barcode, group) {
-  const section = document.createElement('section');
-  section.className = 'store-section';
+function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
+  const table = productRow.parentElement;
+  if (table.querySelector(`tr[data-form-for="${barcode}"]`)) return;
 
-  const h2 = document.createElement('h2');
-  h2.textContent = group.name;
-  section.appendChild(h2);
-
-  const ul = document.createElement('ul');
-  ul.className = 'item-list';
-  group.offers.forEach((offer, idx) => {
-    const li = document.createElement('li');
-    li.className = 'item';
-    const label = document.createElement('label');
-    const span = document.createElement('span');
-    span.textContent = `${offer.chain} — ₪${offer.price.toFixed(2)}`;
-    if (idx === 0) span.style.fontWeight = 'bold';
-    label.appendChild(span);
-    li.appendChild(label);
-    ul.appendChild(li);
-  });
-  section.appendChild(ul);
-
-  const addBtn = document.createElement('button');
-  addBtn.className = 'add-to-list-btn';
-  addBtn.textContent = 'הוסף לקטלוג האישי';
-  addBtn.addEventListener('click', () => openAddForm(section, barcode, group));
-  section.appendChild(addBtn);
-
-  return section;
-}
-
-function openAddForm(container, barcode, group) {
-  if (container.querySelector('.add-form')) return;
+  const formRow = document.createElement('tr');
+  formRow.dataset.formFor = barcode;
+  const cell = document.createElement('td');
+  cell.colSpan = colSpan;
 
   const form = document.createElement('form');
   form.className = 'add-form';
@@ -83,7 +120,7 @@ function openAddForm(container, barcode, group) {
     const opt = document.createElement('option');
     opt.value = s;
     opt.textContent = s;
-    if (s === group.offers[0].chain) opt.selected = true;
+    if (s === defaultChain) opt.selected = true;
     storeSelect.appendChild(opt);
   }
 
@@ -92,16 +129,18 @@ function openAddForm(container, barcode, group) {
 
   const submitBtn = document.createElement('button');
   submitBtn.type = 'submit';
-  submitBtn.textContent = '✓ הוסף';
+  submitBtn.textContent = '✓ הוסף לקטלוג';
 
   form.append(categorySelect, storeSelect, freqSelect, submitBtn);
-  container.appendChild(form);
+  cell.appendChild(form);
+  formRow.appendChild(cell);
+  productRow.after(formRow);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const frequency = freqSelect.value;
     const { error } = await supabaseClient.from('products').insert({
-      name: group.name,
+      name: product.name,
       barcode,
       category: categorySelect.value,
       store: storeSelect.value,
