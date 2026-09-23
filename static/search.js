@@ -83,7 +83,7 @@ function buildPriceTable(products, chains) {
     const addBtn = document.createElement('button');
     addBtn.className = 'add-to-list-btn';
     addBtn.textContent = 'הוסף';
-    addBtn.addEventListener('click', () => openAddForm(row, barcode, product, cheapestChain, chains.length + 2));
+    addBtn.addEventListener('click', () => openAddForm(row, barcode, product, chains.length + 2));
     actionCell.appendChild(addBtn);
     row.appendChild(actionCell);
 
@@ -95,7 +95,7 @@ function buildPriceTable(products, chains) {
   return wrapper;
 }
 
-function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
+function openAddForm(productRow, barcode, product, colSpan) {
   const table = productRow.parentElement;
   if (table.querySelector(`tr[data-form-for="${barcode}"]`)) return;
 
@@ -115,15 +115,6 @@ function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
     categorySelect.appendChild(opt);
   }
 
-  const storeSelect = document.createElement('select');
-  for (const s of STORE_ORDER) {
-    const opt = document.createElement('option');
-    opt.value = s;
-    opt.textContent = s;
-    if (s === defaultChain) opt.selected = true;
-    storeSelect.appendChild(opt);
-  }
-
   const freqSelect = document.createElement('select');
   freqSelect.innerHTML = '<option value="weekly">כל שבוע</option><option value="occasional">לא כל שבוע</option>';
 
@@ -131,7 +122,7 @@ function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
   submitBtn.type = 'submit';
   submitBtn.textContent = '✓ הוסף לקטלוג';
 
-  form.append(categorySelect, storeSelect, freqSelect, submitBtn);
+  form.append(categorySelect, freqSelect, submitBtn);
   cell.appendChild(form);
   formRow.appendChild(cell);
   productRow.after(formRow);
@@ -139,11 +130,13 @@ function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const frequency = freqSelect.value;
+    // אין קיבוע לחנות למוצרים עם ברקוד - איפה הכי זול נקבע דינמית
+    // לפי המחירים העדכניים, לא בזמן ההוספה לקטלוג
     const { error } = await supabaseClient.from('products').insert({
       name: product.name,
       barcode,
       category: categorySelect.value,
-      store: storeSelect.value,
+      store: 'כל חנות',
       frequency,
       on_list: frequency === 'weekly',
     });
@@ -154,7 +147,6 @@ function openAddForm(productRow, barcode, product, defaultChain, colSpan) {
     submitBtn.textContent = '✓ נוסף לקטלוג';
     submitBtn.disabled = true;
     categorySelect.disabled = true;
-    storeSelect.disabled = true;
     freqSelect.disabled = true;
   });
 }
