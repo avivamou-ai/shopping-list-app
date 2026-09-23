@@ -82,9 +82,12 @@ exit_code = 0
 for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
     print(f"\n=== {chain_label} (סניף {store_id}) ===")
 
-    chain_output_dir = os.path.join(OUTPUT_DIR, scraper_name)
-    if os.path.isdir(chain_output_dir):
-        shutil.rmtree(chain_output_dir)
+    # DumpFolderNames uses the scraper's class name (e.g. "Yohananof"), which
+    # doesn't always match the ScraperFactory enum key (e.g. "YOHANANOF") -
+    # clear the whole output dir and search it afterwards rather than
+    # guessing the per-chain subfolder name.
+    if os.path.isdir(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
 
     task = ScarpingTask(
         enabled_scrapers=[scraper_name],
@@ -96,7 +99,7 @@ for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
     task.join()
 
     files = []
-    for root, _dirs, filenames in os.walk(chain_output_dir):
+    for root, _dirs, filenames in os.walk(OUTPUT_DIR):
         for name in filenames:
             files.append(os.path.join(root, name))
 
