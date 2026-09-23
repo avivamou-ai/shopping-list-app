@@ -63,6 +63,7 @@ def upsert_prices(rows):
         return
     resp = requests.post(
         f"{SUPABASE_URL}/rest/v1/prices",
+        params={"on_conflict": "chain,store_id,barcode"},
         headers={
             "apikey": SUPABASE_SERVICE_ROLE_KEY,
             "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
@@ -131,6 +132,13 @@ for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
         exit_code = 1
         continue
 
+    # de-duplicate by barcode (keep the last occurrence) - a single INSERT
+    # with ON CONFLICT DO UPDATE fails if the same conflict target appears
+    # twice in one statement, and full catalogs sometimes list a barcode
+    # more than once (e.g. weighted items, promo variants)
+    by_barcode = {}
+    for item in items:
+        by_barcode[item["barcode"]] = item
     rows = [
         {
             "chain": chain_label,
@@ -139,7 +147,7 @@ for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
             "item_name": item["item_name"],
             "price": item["price"],
         }
-        for item in items
+        for item in by_barcode.values()
     ]
 
     # batch in chunks to keep each request reasonably sized
