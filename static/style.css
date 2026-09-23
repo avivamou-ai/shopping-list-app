@@ -59,6 +59,10 @@ body {
   padding: 1rem;
 }
 
+.login-screen[hidden] {
+  display: none;
+}
+
 .login-form {
   background: var(--card);
   border-radius: 0.75rem;
