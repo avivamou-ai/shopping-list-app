@@ -82,26 +82,37 @@ exit_code = 0
 for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
     print(f"\n=== {chain_label} (סניף {store_id}) ===")
 
-    # DumpFolderNames uses the scraper's class name (e.g. "Yohananof"), which
-    # doesn't always match the ScraperFactory enum key (e.g. "YOHANANOF") -
-    # clear the whole output dir and search it afterwards rather than
-    # guessing the per-chain subfolder name.
-    if os.path.isdir(OUTPUT_DIR):
-        shutil.rmtree(OUTPUT_DIR)
-
-    task = ScarpingTask(
-        enabled_scrapers=[scraper_name],
-        output_configuration={"output_mode": "disk", "base_storage_path": OUTPUT_DIR},
-        file_name_regex=rf"Price.*-{store_id}-\d{{8}}",
-        timeout_in_seconds=600,
-    )
-    task.start(limit=1)
-    task.join()
-
+    # Prefer the full daily catalog (PriceFull) over the intraday delta
+    # file (Price), which only lists items that changed since the last
+    # update and is far too small to be useful here. Not every chain
+    # publishes a PriceFull file (e.g. Rami Levi didn't in testing), so
+    # fall back to PRICE_FILE if PRICE_FULL_FILE isn't found.
     files = []
-    for root, _dirs, filenames in os.walk(OUTPUT_DIR):
-        for name in filenames:
-            files.append(os.path.join(root, name))
+    for file_types in (["PRICE_FULL_FILE"], ["PRICE_FILE"]):
+        # DumpFolderNames uses the scraper's class name (e.g. "Yohananof"),
+        # which doesn't always match the ScraperFactory enum key
+        # (e.g. "YOHANANOF") - clear the whole output dir and search it
+        # afterwards rather than guessing the per-chain subfolder name.
+        if os.path.isdir(OUTPUT_DIR):
+            shutil.rmtree(OUTPUT_DIR)
+
+        task = ScarpingTask(
+            enabled_scrapers=[scraper_name],
+            files_types=file_types,
+            output_configuration={"output_mode": "disk", "base_storage_path": OUTPUT_DIR},
+            file_name_regex=rf"-{store_id}-\d{{8}}",
+            timeout_in_seconds=600,
+        )
+        task.start(limit=1)
+        task.join()
+
+        for root, _dirs, filenames in os.walk(OUTPUT_DIR):
+            for name in filenames:
+                files.append(os.path.join(root, name))
+
+        if files:
+            print(f"(using {file_types[0]})")
+            break
 
     if not files:
         print(f"WARNING: no price file found for {chain_label} store {store_id}")
