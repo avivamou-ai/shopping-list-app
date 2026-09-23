@@ -31,8 +31,15 @@ if not files:
 path = files[0]
 print(f"Downloaded: {path} ({os.path.getsize(path)} bytes)")
 
-with open(path, encoding="utf-8", errors="replace") as fh:
-    content = fh.read()
+with open(path, "rb") as fh:
+    raw = fh.read()
+
+# These government XML files are commonly UTF-16 encoded (with a BOM);
+# fall back to UTF-8 if that guess is wrong.
+try:
+    content = raw.decode("utf-16")
+except UnicodeError:
+    content = raw.decode("utf-8", errors="replace")
 
 print("=== RAW SNIPPET (first 1500 chars) ===")
 print(content[:1500])
