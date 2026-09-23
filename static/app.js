@@ -1,11 +1,11 @@
 async function ensureWeeklyOnList() {
-  await supabase.from('products').update({ on_list: true })
+  await supabaseClient.from('products').update({ on_list: true })
     .eq('frequency', 'weekly').eq('active', true).eq('on_list', false);
 }
 
 async function loadList() {
   await ensureWeeklyOnList();
-  const { data, error } = await supabase.from('products')
+  const { data, error } = await supabaseClient.from('products')
     .select('*').eq('active', true).eq('on_list', true)
     .order('store').order('category').order('name');
   if (error) {
@@ -79,18 +79,18 @@ function buildItemRow(item) {
 
 async function toggleItem(id, checked, li) {
   li.classList.toggle('checked', checked);
-  await supabase.from('products').update({ checked }).eq('id', id);
+  await supabaseClient.from('products').update({ checked }).eq('id', id);
 }
 
 async function removeFromList(id, li) {
   li.remove();
-  await supabase.from('products').update({ on_list: false, checked: false }).eq('id', id);
+  await supabaseClient.from('products').update({ on_list: false, checked: false }).eq('id', id);
 }
 
 async function finishShopping() {
   if (!confirm('לסיים קנייה ולנקות את הרשימה?')) return;
-  await supabase.from('products').update({ checked: false }).eq('frequency', 'weekly');
-  await supabase.from('products').update({ on_list: false, checked: false }).eq('frequency', 'occasional');
+  await supabaseClient.from('products').update({ checked: false }).eq('frequency', 'weekly');
+  await supabaseClient.from('products').update({ on_list: false, checked: false }).eq('frequency', 'occasional');
   loadList();
 }
 

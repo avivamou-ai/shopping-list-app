@@ -1,5 +1,5 @@
 async function loadCatalog() {
-  const { data, error } = await supabase.from('products')
+  const { data, error } = await supabaseClient.from('products')
     .select('*').eq('active', true)
     .order('store').order('category').order('name');
   if (error) {
@@ -56,7 +56,7 @@ function buildProductRow(p) {
     addBtn.className = 'add-to-list-btn';
     addBtn.textContent = 'להוסיף לרשימה השבוע';
     addBtn.addEventListener('click', async () => {
-      await supabase.from('products').update({ on_list: true }).eq('id', p.id);
+      await supabaseClient.from('products').update({ on_list: true }).eq('id', p.id);
       addBtn.textContent = '✓ נוסף לרשימה';
       addBtn.disabled = true;
     });
@@ -69,7 +69,7 @@ function buildProductRow(p) {
   delBtn.title = 'מחק מוצר';
   delBtn.addEventListener('click', async () => {
     if (!confirm('למחוק את המוצר?')) return;
-    await supabase.from('products').update({ active: false }).eq('id', p.id);
+    await supabaseClient.from('products').update({ active: false }).eq('id', p.id);
     li.remove();
   });
   li.appendChild(delBtn);
@@ -86,7 +86,7 @@ function onAuthed() {
       const name = document.getElementById('new-name').value.trim();
       if (!name) return;
       const frequency = document.getElementById('new-frequency').value;
-      const { error } = await supabase.from('products').insert({
+      const { error } = await supabaseClient.from('products').insert({
         name,
         category: document.getElementById('new-category').value,
         store: document.getElementById('new-store').value,

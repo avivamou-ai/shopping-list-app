@@ -13,7 +13,7 @@ function showLogin() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
     showApp();
     onAuthed();
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showLogin();
   }
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
     if (session) {
       showApp();
       onAuthed();
@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const password = document.getElementById('login-password').value;
     const errEl = document.getElementById('login-error');
     errEl.textContent = '';
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) errEl.textContent = 'שגיאה בהתחברות: ' + error.message;
   });
 
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
   });
 });
