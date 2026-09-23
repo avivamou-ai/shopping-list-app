@@ -1,0 +1,25 @@
+name: Sync prices
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install il-supermarket-scraper requests
+
+      - name: Sync prices to Supabase
+        env:
+          # ה-URL אינו סודי (זהה לזה שב-static/supabase-client.js), רק ה-service role
+          # key מגיע מ-Secrets
+          SUPABASE_URL: https://vktaynxmjokycnkdqscf.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/sync_prices.py

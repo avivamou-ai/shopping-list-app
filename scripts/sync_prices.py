@@ -1,0 +1,137 @@
+"""
+מריץ אחת ליום דרך GitHub Actions (.github/workflows/sync-prices.yml).
+מוריד את קובץ המחירים העדכני מכל סניף שהוגדר להלן, ומעדכן את טבלת
+`prices` ב-Supabase (upsert לפי chain+store_id+barcode).
+"""
+import os
+import re
+import shutil
+import sys
+
+import requests
+from il_supermarket_scarper import ScarpingTask
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+
+# רשת (עברית לתצוגה) -> (שם הסקרייפר בספרייה, מספר הסניף)
+STORE_TARGETS = {
+    "רמי לוי": ("RAMI_LEVY", "026"),
+    "אושר עד": ("OSHER_AD", "009"),
+    "יוחננוף": ("YOHANANOF", "005"),
+    "קרפור": ("YAYNO_BITAN_AND_CARREFOUR", "060"),
+    "שופרסל": ("SHUFERSAL", "166"),
+    "המפיץ": ("SHUFERSAL", "161"),
+}
+
+OUTPUT_DIR = "scraper_output"
+
+
+def decode(raw: bytes) -> str:
+    for encoding in ("utf-16", "utf-16-be", "utf-16-le", "utf-8"):
+        try:
+            candidate = raw.decode(encoding)
+        except UnicodeError:
+            continue
+        if candidate.lstrip().startswith("<") and "Root" in candidate[:80]:
+            return candidate
+    return raw.decode("utf-8", errors="replace")
+
+
+def parse_items(xml_text: str):
+    items = []
+    for block in re.findall(r"<Item[ >].*?</Item>", xml_text, flags=re.DOTALL):
+        def field(tag):
+            m = re.search(rf"<{tag}>(.*?)</{tag}>", block, flags=re.DOTALL)
+            return m.group(1).strip() if m else None
+
+        barcode = field("ItemCode")
+        name = field("ItemName") or field("ItemNm")
+        price_text = field("ItemPrice")
+        if not (barcode and name and price_text):
+            continue
+        try:
+            price = float(price_text)
+        except ValueError:
+            continue
+        items.append({"barcode": barcode, "item_name": name, "price": price})
+    return items
+
+
+def upsert_prices(rows):
+    if not rows:
+        return
+    resp = requests.post(
+        f"{SUPABASE_URL}/rest/v1/prices",
+        headers={
+            "apikey": SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates",
+        },
+        json=rows,
+        timeout=120,
+    )
+    if not resp.ok:
+        print(f"Supabase upsert failed ({resp.status_code}): {resp.text[:500]}")
+        resp.raise_for_status()
+
+
+exit_code = 0
+
+for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
+    print(f"\n=== {chain_label} (סניף {store_id}) ===")
+
+    chain_output_dir = os.path.join(OUTPUT_DIR, scraper_name)
+    if os.path.isdir(chain_output_dir):
+        shutil.rmtree(chain_output_dir)
+
+    task = ScarpingTask(
+        enabled_scrapers=[scraper_name],
+        output_configuration={"output_mode": "disk", "base_storage_path": OUTPUT_DIR},
+        file_name_regex=rf"Price.*-{store_id}-\d{{8}}",
+        timeout_in_seconds=600,
+    )
+    task.start(limit=1)
+    task.join()
+
+    files = []
+    for root, _dirs, filenames in os.walk(chain_output_dir):
+        for name in filenames:
+            files.append(os.path.join(root, name))
+
+    if not files:
+        print(f"WARNING: no price file found for {chain_label} store {store_id}")
+        exit_code = 1
+        continue
+
+    path = files[0]
+    with open(path, "rb") as fh:
+        content = decode(fh.read())
+
+    items = parse_items(content)
+    print(f"Parsed {len(items)} items from {path}")
+
+    if not items:
+        print(f"WARNING: 0 items parsed for {chain_label} store {store_id}")
+        exit_code = 1
+        continue
+
+    rows = [
+        {
+            "chain": chain_label,
+            "store_id": store_id,
+            "barcode": item["barcode"],
+            "item_name": item["item_name"],
+            "price": item["price"],
+        }
+        for item in items
+    ]
+
+    # batch in chunks to keep each request reasonably sized
+    batch_size = 1000
+    for i in range(0, len(rows), batch_size):
+        upsert_prices(rows[i:i + batch_size])
+    print(f"Upserted {len(rows)} rows for {chain_label}")
+
+sys.exit(exit_code)
