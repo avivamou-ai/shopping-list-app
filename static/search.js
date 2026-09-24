@@ -47,13 +47,38 @@ async function runSearch(query) {
     return;
   }
 
-  // קבוצה לפי שם מוצר (לא ברקוד): פירות/ירקות טריים ומוצרים במשקל
-  // מקבלים ברקוד/מק"ט פנימי שונה בכל רשת, אז אותו "מלפפון" מופיע עם
-  // כמה ברקודים - מבחינת התצוגה זה עדיין אותו מוצר ושורה אחת.
+  // הרחבה לפי ברקוד: כל רשת קוראת למוצר בשם אחר (למשל "קורנפלקס תלמה"
+  // מול "תלמה דגני בוקר"), אז חיפוש טקסט לבד לא ימצא אותו אצל כל הרשתות.
+  // מוצר ארוז עם ברקוד יצרן אחיד מקבל את אותו ברקוד אצל כל רשת - מביאים
+  // גם שורות שלא תאמו את הטקסט שחיפשנו, כל עוד הברקוד שלהן זהה למשהו
+  // שכבר נמצא, כדי שהמוצר יאוחד לשורה אחת עם מחיר מכל הרשתות.
+  const matchedBarcodes = [...new Set(data.map((r) => r.barcode).filter(Boolean))];
+  if (matchedBarcodes.length) {
+    const expandQuery = await supabaseClient
+      .from('prices')
+      .select('*')
+      .in('barcode', matchedBarcodes);
+
+    if (!expandQuery.error) {
+      for (const row of expandQuery.data) {
+        const key = `${row.barcode}|${row.chain}`;
+        if (!seenKeys.has(key)) {
+          data.push(row);
+          seenKeys.add(key);
+        }
+      }
+    }
+  }
+
+  // קבוצה לפי ברקוד כשיש (מוצר ארוז עם ברקוד יצרן אחיד - הדרך האמינה
+  // לזהות שזה אותו מוצר גם כששם המוצר שונה בין רשתות), ואחרת לפי שם
+  // (פירות/ירקות טריים ומוצרים במשקל מקבלים מק"ט פנימי שונה בכל רשת,
+  // ואין ברקוד משותף לאחד לפיו).
   const products = {};
   const chainsSeen = new Set();
   for (const row of data) {
-    const product = (products[row.item_name] ??= { prices: {}, barcodes: new Set(), category: row.category });
+    const groupKey = row.barcode ? `b:${row.barcode}` : `n:${row.item_name}`;
+    const product = (products[groupKey] ??= { name: row.item_name, prices: {}, barcodes: new Set(), category: row.category });
     if (!(row.chain in product.prices) || row.price < product.prices[row.chain]) {
       product.prices[row.chain] = row.price;
     }
@@ -89,8 +114,9 @@ function buildPriceTable(products, chains) {
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  for (const name of Object.keys(products)) {
-    const product = products[name];
+  for (const groupKey of Object.keys(products)) {
+    const product = products[groupKey];
+    const name = product.name;
     const cheapestPrice = Math.min(...Object.values(product.prices));
     const cheapestChain = Object.keys(product.prices).find(
       (c) => product.prices[c] === cheapestPrice
