@@ -293,6 +293,28 @@ main {
   background: var(--bg);
 }
 
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.pager-btn {
+  flex: 1;
+  padding: 0.7rem;
+  background: var(--card);
+  color: var(--primary-dark);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14201a;

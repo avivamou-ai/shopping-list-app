@@ -1,7 +1,8 @@
-const CACHE_NAME = 'shopping-list-v3';
-const APP_SHELL = ['./', './index.html', './catalog.html', './search.html', './static/style.css',
-                    './static/constants.js', './static/supabase-client.js', './static/auth.js',
-                    './static/app.js', './static/catalog.js', './static/search.js',
+const CACHE_NAME = 'shopping-list-v4';
+const APP_SHELL = ['./', './index.html', './catalog.html', './search.html', './browse.html',
+                    './static/style.css', './static/constants.js', './static/supabase-client.js',
+                    './static/auth.js', './static/app.js', './static/catalog.js',
+                    './static/search.js', './static/browse.js',
                     './static/manifest.json', './static/icon.svg'];
 
 self.addEventListener('install', (event) => {
