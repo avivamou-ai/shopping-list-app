@@ -1,6 +1,7 @@
 const PAGE_SIZE = 50;
 let currentPage = 0;
 let currentStore = null;
+let currentCategory = '';
 
 function populateStoreSelect() {
   const select = document.getElementById('browse-store');
@@ -8,6 +9,16 @@ function populateStoreSelect() {
     const opt = document.createElement('option');
     opt.value = chain;
     opt.textContent = chain;
+    select.appendChild(opt);
+  }
+}
+
+function populateCategorySelect() {
+  const select = document.getElementById('browse-category');
+  for (const category of CATEGORY_ORDER) {
+    const opt = document.createElement('option');
+    opt.value = category;
+    opt.textContent = category;
     select.appendChild(opt);
   }
 }
@@ -23,12 +34,12 @@ async function loadPage() {
   const from = currentPage * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data, error, count } = await supabaseClient
+  let query = supabaseClient
     .from('prices')
     .select('*', { count: 'exact' })
-    .eq('chain', currentStore)
-    .order('item_name')
-    .range(from, to);
+    .eq('chain', currentStore);
+  if (currentCategory) query = query.eq('category', currentCategory);
+  const { data, error, count } = await query.order('item_name').range(from, to);
 
   if (error) {
     summaryEl.textContent = 'שגיאה: ' + error.message;
@@ -37,7 +48,8 @@ async function loadPage() {
 
   const totalCount = count ?? data.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  summaryEl.textContent = `${currentStore} — ${totalCount} מוצרים (עמוד ${currentPage + 1} מתוך ${totalPages})`;
+  const categoryLabel = currentCategory ? ` — ${currentCategory}` : '';
+  summaryEl.textContent = `${currentStore}${categoryLabel} — ${totalCount} מוצרים (עמוד ${currentPage + 1} מתוך ${totalPages})`;
 
   resultsEl.appendChild(buildTable(data));
   renderPager(totalPages);
@@ -134,6 +146,7 @@ async function openAddForm(productRow, priceRow) {
     const opt = document.createElement('option');
     opt.value = c;
     opt.textContent = c;
+    if (c === priceRow.category) opt.selected = true;
     categorySelect.appendChild(opt);
   }
 
@@ -176,9 +189,11 @@ let browseFormBound = false;
 function onAuthed() {
   if (!browseFormBound) {
     populateStoreSelect();
+    populateCategorySelect();
     document.getElementById('browse-form').addEventListener('submit', (e) => {
       e.preventDefault();
       currentStore = document.getElementById('browse-store').value;
+      currentCategory = document.getElementById('browse-category').value;
       currentPage = 0;
       loadPage();
     });

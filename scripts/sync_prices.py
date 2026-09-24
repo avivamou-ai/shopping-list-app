@@ -11,6 +11,8 @@ import sys
 import requests
 from il_supermarket_scarper import ScarpingTask
 
+from categorize import classify_category
+
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
@@ -146,6 +148,7 @@ for chain_label, (scraper_name, store_id) in STORE_TARGETS.items():
             "barcode": item["barcode"],
             "item_name": item["item_name"],
             "price": item["price"],
+            "category": classify_category(item["item_name"]),
         }
         for item in by_barcode.values()
     ]

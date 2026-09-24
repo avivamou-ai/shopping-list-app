@@ -53,7 +53,7 @@ async function runSearch(query) {
   const products = {};
   const chainsSeen = new Set();
   for (const row of data) {
-    const product = (products[row.item_name] ??= { prices: {}, barcodes: new Set() });
+    const product = (products[row.item_name] ??= { prices: {}, barcodes: new Set(), category: row.category });
     if (!(row.chain in product.prices) || row.price < product.prices[row.chain]) {
       product.prices[row.chain] = row.price;
     }
@@ -148,6 +148,7 @@ function openAddForm(productRow, name, product, colSpan) {
     const opt = document.createElement('option');
     opt.value = c;
     opt.textContent = c;
+    if (c === product.category) opt.selected = true;
     categorySelect.appendChild(opt);
   }
 
